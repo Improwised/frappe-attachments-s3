@@ -45,3 +45,4 @@ services:
 volumes:
   mariadb-erp13:
   minio:
+  
