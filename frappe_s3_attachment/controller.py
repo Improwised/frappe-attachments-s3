@@ -10,8 +10,10 @@ import boto3
 import magic
 import frappe
 
+from urllib.parse import urlparse
 from botocore.exceptions import ClientError
 
+#custom added code for download file is represented as dow{number}
 
 class S3Operations(object):
 
@@ -34,8 +36,18 @@ class S3Operations(object):
                 aws_secret_access_key=self.s3_settings_doc.aws_secret,
                 region_name=self.s3_settings_doc.region_name,
             )
+            # does initialize boto3 resource libraray
+            self.S3_RESOURCE = boto3.resource(
+                's3',
+                aws_access_key_id=self.s3_settings_doc.aws_key,
+                aws_secret_access_key=self.s3_settings_doc.aws_secret,
+                region_name=self.s3_settings_doc.region_name,
+                )
         else:
             self.S3_CLIENT = boto3.client('s3')
+            self.S3_RESOURCE = boto3.resource('s3')
+        
+        #original-1.3: original code but we can use bucket name for boto3 resource
         self.BUCKET = self.s3_settings_doc.bucket_name
         self.folder_name = self.s3_settings_doc.folder_name
 
@@ -237,7 +249,6 @@ def file_upload_to_s3(doc, method):
 
         frappe.db.commit()
 
-
 @frappe.whitelist()
 def generate_file(key=None, file_name=None):
     """
@@ -292,6 +303,50 @@ def upload_existing_files_s3(name, file_name):
     else:
         pass
 
+# download s3 files
+def download_s3_files(private_local_folder_path, public_local_folder_path):
+    s3_download = S3Operations()
+    bucket = s3_download.S3_RESOURCE.Bucket(s3_download.BUCKET)
+    for obj in bucket.objects.filter(Prefix='files'):
+        # Check if the object is a file and not a folder
+        if not obj.key.endswith('/'):
+            download_s3_file(obj, s3_download.BUCKET, s3_download.folder_name, private_local_folder_path, public_local_folder_path)
+
+# download s3 file
+def download_s3_file(obj, bucket_name, s3_folder_path, private_local_folder_path, public_local_folder_path):
+    acl = obj.Acl()
+    
+    s3 = S3Operations()
+    s3_object = s3.S3_RESOURCE.Object(str(bucket_name), str(obj.key))
+    s3FileName = obj.key.split('/')[-1]
+    fileName = s3FileName.split('_',1)[1]
+    
+    if len(acl.grants) != 1:
+        if acl.grants[1]['Grantee']['Type'] == 'Group' and acl.grants[1]['Grantee']['URI'] == 'http://acs.amazonaws.com/groups/global/AllUsers':
+            # Download public files to public directory
+            public_url = f'https://{bucket_name}.s3.amazonaws.com/{obj.key}'
+            local_path = public_local_folder_path + "/" + fileName
+            print(f'Downloading public file {public_url} to {local_path}')
+            try:
+                s3_object.download_file(str(local_path))
+            except Exception as e:
+                print(f"Error downloading file {obj.key}: {str(e)}")
+            
+    else:
+        # Download private files to private directory
+        local_path = private_local_folder_path  + "/" + fileName
+        print(f'Downloading private file {obj.key} to {local_path}')
+        try:
+            s3_object.download_file(str(local_path))
+        except Exception as e:
+            print(f"Error downloading file {obj.key}: {str(e)}")
+
+def download_files():
+    private_local_folder_path = '/workspace/development/frappe-bench/sites/ims.localhost/private/files'
+    public_local_folder_path = '/workspace/development/frappe-bench/sites/ims.localhost/public/files'
+
+    # Download private files to a private directory
+    download_s3_files(private_local_folder_path, public_local_folder_path)
 
 def s3_file_regex_match(file_url):
     """
@@ -313,12 +368,21 @@ def migrate_existing_files():
         'File',
         fields=['name', 'file_url', 'file_name']
     )
+    print(files_list)
     for file in files_list:
         if file['file_url']:
             if not s3_file_regex_match(file['file_url']):
                 upload_existing_files_s3(file['name'], file['file_name'])
     return True
 
+@frappe.whitelist()
+def migrate_s3_files_to_local():
+    """
+    Function to migrate the s3 files to local.
+    """
+    # get_all_files_from_s3_folder_and_download_to_local
+    download_files()
+    return True
 
 def delete_from_cloud(doc, method):
     """Delete file from s3"""
