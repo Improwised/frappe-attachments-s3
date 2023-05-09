@@ -315,6 +315,7 @@ def download_s3_files(private_local_folder_path, public_local_folder_path):
 
 # download s3 file
 def download_s3_file(obj, bucket_name, private_local_folder_path, public_local_folder_path):
+    # check from file_url that file is in s3 or local and ommit download if it is in local
     name = frappe.db.sql(f"""select `name` from `tabFile` where `file_url` LIKE '%{obj.key}%'""")
     if len(name)==0:
         return
