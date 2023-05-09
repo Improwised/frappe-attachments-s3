@@ -9,8 +9,6 @@ services:
       - --skip-innodb-read-only-compressed # Temporary fix for MariaDB 10.6
     environment:
       MYSQL_ROOT_PASSWORD: erpnext
-      MARIADB_USER: erpnext
-      MARIADB_PASSWORD: erpnext
     ports:
       - 3306:3306
     volumes:
