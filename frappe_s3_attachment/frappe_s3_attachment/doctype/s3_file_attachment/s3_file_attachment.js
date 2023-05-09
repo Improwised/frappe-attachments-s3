@@ -3,6 +3,7 @@
 
 frappe.ui.form.on('S3 File Attachment', {
 	refresh: function(frm) {
+        
 	},
 
 	migrate_existing_files: function (frm) {
