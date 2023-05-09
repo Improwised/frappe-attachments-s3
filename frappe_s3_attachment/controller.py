@@ -315,6 +315,9 @@ def download_s3_files(private_local_folder_path, public_local_folder_path):
 
 # download s3 file
 def download_s3_file(obj, bucket_name, private_local_folder_path, public_local_folder_path):
+    name = frappe.db.sql(f"""select `name` from `tabFile` where `file_url` LIKE '%{obj.key}%'""")
+    if len(name)==0:
+        return
     acl = obj.Acl()
     
     s3 = S3Operations()
