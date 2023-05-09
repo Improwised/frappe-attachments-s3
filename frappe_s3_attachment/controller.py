@@ -396,7 +396,6 @@ def migrate_existing_files():
         'File',
         fields=['name', 'file_url', 'file_name']
     )
-    print(files_list)
     for file in files_list:
         if file['file_url']:
             if not s3_file_regex_match(file['file_url']):
