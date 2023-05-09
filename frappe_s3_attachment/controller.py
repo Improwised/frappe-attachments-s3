@@ -5,6 +5,7 @@ import string
 import datetime
 import re
 import os
+import time
 
 import boto3
 import magic
@@ -310,37 +311,51 @@ def download_s3_files(private_local_folder_path, public_local_folder_path):
     for obj in bucket.objects.filter(Prefix='files'):
         # Check if the object is a file and not a folder
         if not obj.key.endswith('/'):
-            download_s3_file(obj, s3_download.BUCKET, s3_download.folder_name, private_local_folder_path, public_local_folder_path)
+            download_s3_file(obj, s3_download.BUCKET, private_local_folder_path, public_local_folder_path)
 
 # download s3 file
-def download_s3_file(obj, bucket_name, s3_folder_path, private_local_folder_path, public_local_folder_path):
+def download_s3_file(obj, bucket_name, private_local_folder_path, public_local_folder_path):
+    name = frappe.db.sql(f"""select `name` from `tabFile` where `file_url` LIKE '%{obj.key}%'""")
+    if len(name)==0:
+        return
     acl = obj.Acl()
     
     s3 = S3Operations()
     s3_object = s3.S3_RESOURCE.Object(str(bucket_name), str(obj.key))
     s3FileName = obj.key.split('/')[-1]
     fileName = s3FileName.split('_',1)[1]
-    
+    max_retries = 5
+    retry_delay = 0.5
+
     if len(acl.grants) != 1:
         if acl.grants[1]['Grantee']['Type'] == 'Group' and acl.grants[1]['Grantee']['URI'] == 'http://acs.amazonaws.com/groups/global/AllUsers':
             # Download public files to public directory
-            public_url = f'https://{bucket_name}.s3.amazonaws.com/{obj.key}'
             local_path = public_local_folder_path + "/" + fileName
             local_url = '/files/' + fileName
-            try:
-                s3_object.download_file(str(local_path))
-                update_db_s3_to_local(local_url, fileName, obj.key)
-            except Exception as e:
-                frappe.throw((f"Error downloading file {obj.key}: {str(e)}"))        
+            for i in range(max_retries):
+                try:
+                    s3_object.download_file(str(local_path))
+                    update_db_s3_to_local(local_url, fileName, obj.key)
+                    return
+                except Exception as e:
+                    if i < max_retries - 1:
+                        time.sleep(retry_delay)
+                    else:
+                        frappe.throw(frappe._(f"Error downloading file {obj.key}: {str(e)}"))
     else:
         # Download private files to private directory
         local_path = private_local_folder_path  + "/" + fileName
         local_url = '/private/files/' + fileName
-        try:
-            s3_object.download_file(str(local_path))
-            update_db_s3_to_local(local_url, fileName, obj.key)
-        except Exception as e:
-            frappe.throw((f"Error downloading file {obj.key}: {str(e)}"))
+        for i in range(max_retries):
+            try:
+                s3_object.download_file(str(local_path))
+                update_db_s3_to_local(local_url, fileName, obj.key)
+                return
+            except Exception as e:
+                if i < max_retries - 1:
+                    time.sleep(retry_delay)
+                else:
+                    frappe.throw(frappe._(f"Error downloading file {obj.key}: {str(e)}"))
 
 #Update database while downloading files from s3
 def update_db_s3_to_local(file_url, file_name, key):
