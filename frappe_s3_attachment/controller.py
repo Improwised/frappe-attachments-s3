@@ -326,19 +326,30 @@ def download_s3_file(obj, bucket_name, s3_folder_path, private_local_folder_path
             # Download public files to public directory
             public_url = f'https://{bucket_name}.s3.amazonaws.com/{obj.key}'
             local_path = public_local_folder_path + "/" + fileName
-            print(f'Downloading public file {public_url} to {local_path}')
+            local_url = '/files/' + fileName
             try:
                 s3_object.download_file(str(local_path))
+                update_db_s3_to_local(local_url, fileName, obj.key)
             except Exception as e:
-                print(f"Error downloading file {obj.key}: {str(e)}")        
+                frappe.throw((f"Error downloading file {obj.key}: {str(e)}"))        
     else:
         # Download private files to private directory
         local_path = private_local_folder_path  + "/" + fileName
-        print(f'Downloading private file {obj.key} to {local_path}')
+        local_url = '/private/files/' + fileName
         try:
             s3_object.download_file(str(local_path))
+            update_db_s3_to_local(local_url, fileName, obj.key)
         except Exception as e:
-            print(f"Error downloading file {obj.key}: {str(e)}")
+            frappe.throw((f"Error downloading file {obj.key}: {str(e)}"))
+
+#Update database while downloading files from s3
+def update_db_s3_to_local(file_url, file_name, key):
+    try:
+        name = frappe.db.sql(f"""select `name` from `tabFile` where `file_url` LIKE '%{key}%'""")
+        doc = frappe.db.sql(f"""UPDATE `tabFile` SET `file_url`='{file_url}', `file_name`='{file_name}' WHERE `name` = '{name[0][0]}'""")
+        frappe.db.commit()
+    except Exception as e:
+        print(f"Error updating tabFile table: {str(e)}")
 
 # Provide local folder path for downloading files from s3
 def download_files():
@@ -381,7 +392,6 @@ def migrate_s3_files_to_local():
     """
     Function to migrate the s3 files to local.
     """
-    # get_all_files_from_s3_folder_and_download_to_local
     download_files()
     return True
 
