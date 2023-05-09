@@ -330,8 +330,7 @@ def download_s3_file(obj, bucket_name, s3_folder_path, private_local_folder_path
             try:
                 s3_object.download_file(str(local_path))
             except Exception as e:
-                print(f"Error downloading file {obj.key}: {str(e)}")
-            
+                print(f"Error downloading file {obj.key}: {str(e)}")        
     else:
         # Download private files to private directory
         local_path = private_local_folder_path  + "/" + fileName
@@ -341,9 +340,11 @@ def download_s3_file(obj, bucket_name, s3_folder_path, private_local_folder_path
         except Exception as e:
             print(f"Error downloading file {obj.key}: {str(e)}")
 
+# Provide local folder path for downloading files from s3
 def download_files():
-    private_local_folder_path = '/workspace/development/frappe-bench/sites/ims.localhost/private/files'
-    public_local_folder_path = '/workspace/development/frappe-bench/sites/ims.localhost/public/files'
+    site_path = frappe.utils.get_site_path()
+    private_local_folder_path = site_path + '/private/files'
+    public_local_folder_path = site_path + '/public/files'
 
     # Download private files to a private directory
     download_s3_files(private_local_folder_path, public_local_folder_path)
