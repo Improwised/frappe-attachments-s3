@@ -327,22 +327,20 @@ def download_s3_file(obj, bucket_name, s3_folder_path, private_local_folder_path
             public_url = f'https://{bucket_name}.s3.amazonaws.com/{obj.key}'
             local_path = public_local_folder_path + "/" + fileName
             local_url = '/files/' + fileName
-            print(f'Downloading public file {public_url} to {local_path}')
             try:
                 s3_object.download_file(str(local_path))
                 update_db_s3_to_local(local_url, fileName, obj.key)
             except Exception as e:
-                print(f"Error downloading file {obj.key}: {str(e)}")        
+                frappe.throw((f"Error downloading file {obj.key}: {str(e)}"))        
     else:
         # Download private files to private directory
         local_path = private_local_folder_path  + "/" + fileName
         local_url = '/private/files/' + fileName
-        print(f'Downloading private file {obj.key} to {local_path}')
         try:
             s3_object.download_file(str(local_path))
             update_db_s3_to_local(local_url, fileName, obj.key)
         except Exception as e:
-            print(f"Error downloading file {obj.key}: {str(e)}")
+            frappe.throw((f"Error downloading file {obj.key}: {str(e)}"))
 
 #Update database while downloading files from s3
 def update_db_s3_to_local(file_url, file_name, key):
