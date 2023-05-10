@@ -308,7 +308,7 @@ def upload_existing_files_s3(name, file_name):
 def download_s3_files(private_local_folder_path, public_local_folder_path):
     s3_download = S3Operations()
     bucket = s3_download.S3_RESOURCE.Bucket(s3_download.BUCKET)
-    for obj in bucket.objects.filter(Prefix='files'):
+    for obj in bucket.objects.filter(Prefix=s3_download.folder_name):
         # Check if the object is a file and not a folder
         if not obj.key.endswith('/'):
             download_s3_file(obj, s3_download.BUCKET, private_local_folder_path, public_local_folder_path)
