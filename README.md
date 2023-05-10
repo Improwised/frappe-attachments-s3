@@ -20,7 +20,7 @@ Frappe app to make file upload automatically upload and read from s3 and downloa
 #### Installation.
 
 1. bench get-app --branch v13 [https://github.com/Improwised/Frappe-attachments-s3.git](https://github.com/Improwised/frappe_s3_attachment)
-2. bench install-app frappe_s3_attachment
+2. bench --site {site} install-app frappe_s3_attachment
 
 #### Configuration Setup.
 
@@ -35,15 +35,29 @@ Frappe app to make file upload automatically upload and read from s3 and downloa
 ### Setup for migrating from S3 to local
 
 1. There is Migrating to local button in "s3 File Attachment"
-2. It will migrate all files from s3 to local folder.
+2. It will migrate all files from s3 to local folder.<br/>
+   Updated path for private files - private/files/{fileName.Extension}<br/>
+   Updated path for public files - files/{fileName.Extension}
 
 ### Safely removing a Zerodha app and install Improwised frappe s3 attachment.
 
-1. bench --site {site} uninstall-app frappe_s3_attachment (It will remove Zerodha app from site)
-2. bench get-app --branch v13 https://github.com/Improwised/frappe_s3_attachment.git (Get App of Improwised. If, any overwritten permission needed, provide yes)
-3. bench --site {site} install-app frappe_s3_attachment (It will install Improwised Frappe S3 attachment in site)
+1. This will remove Zerodha app from site
+```
+$ bench --site {site} uninstall-app frappe_s3_attachment 
+```
+2. Get App of Improwised. If, any overwritten permission needed, provide yes
+```
+$ bench get-app --branch v13 https://github.com/Improwised/frappe_s3_attachment.git 
+```
+3. This will install Improwised Frappe S3 attachment in site
+```
+$ bench --site {site} install-app frappe_s3_attachment 
+```
 4. After Migrating to local, to remove improwised frappe-s3-attachment do step 5.
-5. bench --site {site} uninstall-app frappe_s3_attachment (It will remove Improwised app from site)
+5. This will remove Improwised app from site
+```
+$bench --site {site} uninstall-app frappe_s3_attachment 
+```
 
 #### License
 
