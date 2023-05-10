@@ -320,6 +320,7 @@ def download_s3_file(obj, bucket_name, private_local_folder_path, public_local_f
     name = frappe.db.sql(f"""select `name` from `tabFile` where `file_url` LIKE '%{obj.key}%'""")
     if len(name)==0:
         return
+    
     acl = obj.Acl()
     
     s3 = S3Operations()
@@ -363,6 +364,8 @@ def update_db_s3_to_local(file_url, file_path_for_hash, file_name, key):
     try:
         contentHash = update_db_hash_s3_to_local(file_path_for_hash)
         name = frappe.db.sql(f"""select `name` from `tabFile` where `file_url` LIKE '%{key}%'""")
+        if len(name)==0:
+            return
         doc = frappe.db.sql(f"""UPDATE `tabFile` SET `file_url`='{file_url}', `file_name`='{file_name}', `content_hash`='{contentHash}' WHERE `name` = '{name[0][0]}'""")
         frappe.db.commit()
     except Exception as e:
@@ -371,13 +374,13 @@ def update_db_s3_to_local(file_url, file_path_for_hash, file_name, key):
 #update tabFile content_hash
 def update_db_hash_s3_to_local(file_url):
     file_path = frappe.utils.get_site_path()+file_url
-    with open(file_path, "r") as f:
+    with open(file_path, "rb") as f:
         content_hash = get_content_hash(f.read())
     return content_hash
         
 #generate content hash for file.
 def get_content_hash(content):
-	return hashlib.md5(content.encode()).hexdigest() 
+	return hashlib.md5(content).hexdigest() 
 
 # Provide local folder path for downloading files from s3
 def download_files():
