@@ -334,11 +334,11 @@ def download_s3_file(obj, bucket_name, private_local_folder_path, public_local_f
             # Download public files to public directory
             local_path = public_local_folder_path + "/" + fileName
             local_url = '/files/' + fileName
+            local_url_hash= '/public/files/'+fileName
             for i in range(max_retries):
                 try:
                     s3_object.download_file(str(local_path))
-                    update_db_s3_to_local(local_url, fileName, obj.key)
-                    return
+                    update_db_s3_to_local(local_url, local_url_hash, fileName, obj.key)
                 except Exception as e:
                     if i < max_retries - 1:
                         time.sleep(retry_delay)
@@ -351,8 +351,7 @@ def download_s3_file(obj, bucket_name, private_local_folder_path, public_local_f
         for i in range(max_retries):
             try:
                 s3_object.download_file(str(local_path))
-                update_db_s3_to_local(local_url, fileName, obj.key)
-                return
+                update_db_s3_to_local(local_url, local_url, fileName, obj.key)
             except Exception as e:
                 if i < max_retries - 1:
                     time.sleep(retry_delay)
@@ -360,18 +359,19 @@ def download_s3_file(obj, bucket_name, private_local_folder_path, public_local_f
                     frappe.throw(frappe._(f"Error downloading file {obj.key}: {str(e)}"))
 
 #Update database while downloading files from s3
-def update_db_s3_to_local(file_url, file_name, key):
+def update_db_s3_to_local(file_url, file_path_for_hash, file_name, key):
     try:
-        contentHash = update_db_hash_s3_to_local(file_name)
+        contentHash = update_db_hash_s3_to_local(file_path_for_hash)
         name = frappe.db.sql(f"""select `name` from `tabFile` where `file_url` LIKE '%{key}%'""")
-        doc = frappe.db.sql(f"""UPDATE `tabFile` SET `file_url`='{file_url}', `file_name`='{file_name}', `content_hash`={contentHash} WHERE `name` = '{name[0][0]}'""")
+        doc = frappe.db.sql(f"""UPDATE `tabFile` SET `file_url`='{file_url}', `file_name`='{file_name}', `content_hash`='{contentHash}' WHERE `name` = '{name[0][0]}'""")
         frappe.db.commit()
     except Exception as e:
         print(f"Error updating tabFile table: {str(e)}")
 
 #update tabFile content_hash
-def update_db_hash_s3_to_local(file_name):
-    with open(file_name, "r") as f:
+def update_db_hash_s3_to_local(file_url):
+    file_path = frappe.utils.get_site_path()+file_url
+    with open(file_path, "r") as f:
         content_hash = get_content_hash(f.read())
     return content_hash
         
