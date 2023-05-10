@@ -1,4 +1,5 @@
 from __future__ import unicode_literals
+import hashlib
 
 import random
 import string
@@ -361,11 +362,22 @@ def download_s3_file(obj, bucket_name, private_local_folder_path, public_local_f
 #Update database while downloading files from s3
 def update_db_s3_to_local(file_url, file_name, key):
     try:
+        contentHash = update_db_hash_s3_to_local(file_name)
         name = frappe.db.sql(f"""select `name` from `tabFile` where `file_url` LIKE '%{key}%'""")
-        doc = frappe.db.sql(f"""UPDATE `tabFile` SET `file_url`='{file_url}', `file_name`='{file_name}' WHERE `name` = '{name[0][0]}'""")
+        doc = frappe.db.sql(f"""UPDATE `tabFile` SET `file_url`='{file_url}', `file_name`='{file_name}', `content_hash`={contentHash} WHERE `name` = '{name[0][0]}'""")
         frappe.db.commit()
     except Exception as e:
         print(f"Error updating tabFile table: {str(e)}")
+
+#update tabFile content_hash
+def update_db_hash_s3_to_local(file_name):
+    with open(file_name, "r") as f:
+        content_hash = get_content_hash(f.read())
+    return content_hash
+        
+#generate content hash for file.
+def get_content_hash(content):
+	return hashlib.md5(content.encode()).hexdigest() 
 
 # Provide local folder path for downloading files from s3
 def download_files():
