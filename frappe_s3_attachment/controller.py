@@ -321,7 +321,7 @@ def download_s3_file(obj, bucket_name, private_local_folder_path, public_local_f
     if len(name)==0:
         return
     
-    acl = obj.Acl()
+    isPrivate = frappe.db.sql(f"""select `is_private` from `tabFile` where `name`='{name[0][0]}'""")
     
     s3 = S3Operations()
     s3_object = s3.S3_RESOURCE.Object(str(bucket_name), str(obj.key))
@@ -329,22 +329,21 @@ def download_s3_file(obj, bucket_name, private_local_folder_path, public_local_f
     fileName = s3FileName.split('_',1)[1]
     max_retries = 5
     retry_delay = 0.5
-
-    if len(acl.grants) != 1:
-        if acl.grants[1]['Grantee']['Type'] == 'Group' and acl.grants[1]['Grantee']['URI'] == 'http://acs.amazonaws.com/groups/global/AllUsers':
-            # Download public files to public directory
-            local_path = public_local_folder_path + "/" + fileName
-            local_url = '/files/' + fileName
-            local_url_hash= '/public/files/'+fileName
-            for i in range(max_retries):
-                try:
-                    s3_object.download_file(str(local_path))
-                    update_db_s3_to_local(local_url, local_url_hash, fileName, obj.key)
-                except Exception as e:
-                    if i < max_retries - 1:
-                        time.sleep(retry_delay)
-                    else:
-                        frappe.throw(frappe._(f"Error downloading file {obj.key}: {str(e)}"))
+    if not isPrivate[0][0]:
+        # Download public files to public directory
+        local_path = public_local_folder_path + "/" + fileName
+        local_url = '/files/' + fileName
+        local_url_hash= '/public/files/'+fileName
+        for i in range(max_retries):
+            try:
+                s3_object.download_file(str(local_path))
+                update_db_s3_to_local(local_url, local_url_hash, fileName, obj.key)
+                return
+            except Exception as e:
+                if i < max_retries - 1:
+                    time.sleep(retry_delay)
+                else:
+                    frappe.throw(frappe._(f"Error downloading file {obj.key}: {str(e)}"))
     else:
         # Download private files to private directory
         local_path = private_local_folder_path  + "/" + fileName
@@ -353,6 +352,7 @@ def download_s3_file(obj, bucket_name, private_local_folder_path, public_local_f
             try:
                 s3_object.download_file(str(local_path))
                 update_db_s3_to_local(local_url, local_url, fileName, obj.key)
+                return
             except Exception as e:
                 if i < max_retries - 1:
                     time.sleep(retry_delay)
@@ -364,8 +364,6 @@ def update_db_s3_to_local(file_url, file_path_for_hash, file_name, key):
     try:
         contentHash = update_db_hash_s3_to_local(file_path_for_hash)
         name = frappe.db.sql(f"""select `name` from `tabFile` where `file_url` LIKE '%{key}%'""")
-        if len(name)==0:
-            return
         doc = frappe.db.sql(f"""UPDATE `tabFile` SET `file_url`='{file_url}', `file_name`='{file_name}', `content_hash`='{contentHash}' WHERE `name` = '{name[0][0]}'""")
         frappe.db.commit()
     except Exception as e:
