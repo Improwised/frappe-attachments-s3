@@ -325,10 +325,10 @@ def download_s3_file(name, obj_key, bucket_name, private_local_folder_path, publ
 
     s3 = S3Operations()
     s3_object = s3.S3_RESOURCE.Object(str(bucket_name), str(obj_key))
-    fileName = obj_key
+    fileName = obj_key.split('/')[-1]
     max_retries = 5
     retry_delay = 0.5
-    print("=/=/=/==/=/=/=/=/=/=/=/==/=/=/=/=/=/=/==/=/=/==/",name,bucket_name,isPrivate[0][0])
+    print("=/=/=/==/=/=/=/=/=/=/=/==/=/=/=/=/=/=/==/=/=/==/",fileName,bucket_name,isPrivate[0][0])
     if not isPrivate[0][0]:
         # Download public files to public directory
         local_path = public_local_folder_path + "/" + fileName
@@ -378,16 +378,18 @@ def download_file_from_s3_url(name, s3_url):
 
 #Update database while downloading files from s3
 def update_db_s3_to_local(file_url, file_path_for_hash, file_name, name):
+    print("--------------------------------------------",file_name)
     try:
-        parent_doctype = frappe.db.sql(f"""select `attached_to_doctype` from `tabFile` where `name`={name}'""")
-        parent_name = frappe.db.sql(f"""select `attached_to_name` from `tabFile` where `name`={name}'""")
-        parent_field = frappe.db.sql(f"""select `attached_to_field` from `tabFile` where `name`={name}'""")
+        parent_doctype = frappe.db.sql(f"""select `attached_to_doctype` from `tabFile` where `name`='{name}'""")
+        parent_name = frappe.db.sql(f"""select `attached_to_name` from `tabFile` where `name`='{name}'""")
+        parent_field = frappe.db.sql(f"""select `attached_to_field` from `tabFile` where `name`='{name}'""")
 
         contentHash = update_db_hash_s3_to_local(file_path_for_hash)
 
         doc = frappe.db.sql(f"""UPDATE `tabFile` SET `file_url`='{file_url}', `file_name`='{file_name}', `content_hash`='{contentHash}' WHERE `name` = '{name}'""")
-
-        if frappe.get_meta(parent_doctype[0][0]).get('image_field'):
+        # print("=================||||||||||======================",frappe.get_meta(parent_doctype[0][0]).get(parent_field[0][0]))
+        #See that again
+        if frappe.get_meta(parent_doctype[0][0]).get(parent_field[0][0]):
             frappe.db.set_value(parent_doctype[0][0], parent_name[0][0], frappe.get_meta(parent_doctype[0][0]).get(parent_field[0][0]), file_url)
 
         frappe.db.commit()
