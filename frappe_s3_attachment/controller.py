@@ -364,8 +364,8 @@ def download_s3_file(name, obj_key, bucket_name, private_local_folder_path, publ
 def download_file_from_s3_url(name, s3_url):
     # Parse the S3 URL
     parsed_url = urlparse(s3_url)
-    bucket_name = parsed_url.netloc
-    object_key = parsed_url.path.lstrip('/')
+    bucket_name = parsed_url.path.split('/',2)[1]
+    object_key = parsed_url.path.split('/',2)[2]
 
     site_path = frappe.utils.get_site_path()
     private_local_folder_path = site_path + '/private/files'
@@ -373,8 +373,7 @@ def download_file_from_s3_url(name, s3_url):
 
     # Download the file using boto3
     s3_download = S3Operations()
-    print("====================================>",object_key)
-    download_s3_file(name, object_key, s3_download.BUCKET, private_local_folder_path, public_local_folder_path)
+    download_s3_file(name, object_key, bucket_name, private_local_folder_path, public_local_folder_path)
 
 
 #Update database while downloading files from s3
