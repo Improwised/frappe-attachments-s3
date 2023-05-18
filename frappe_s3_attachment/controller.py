@@ -374,7 +374,7 @@ def update_db_s3_to_local(file_url, file_path_for_hash, file_name, name):
         doc = frappe.db.sql(f"""UPDATE `tabFile` SET `file_url`='{file_url}', `file_name`='{file_name}', `content_hash`='{contentHash}' WHERE `name` = '{name}'""")
 
         #See that again
-        if not parent_field[0][0]=='None':
+        if parent_field[0][0] != None:
             frappe.db.set_value(parent_doctype[0][0], parent_name[0][0], parent_field[0][0], file_url)
 
         frappe.db.commit()
