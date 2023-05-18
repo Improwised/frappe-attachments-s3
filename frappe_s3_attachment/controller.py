@@ -266,6 +266,7 @@ def generate_file(key=None, file_name=None):
     return
 
 
+
 def upload_existing_files_s3(name, file_name):
     """
     Function to upload all existing files.
@@ -305,31 +306,15 @@ def upload_existing_files_s3(name, file_name):
     else:
         pass
 
-# download s3 files
-# def download_s3_files(private_local_folder_path, public_local_folder_path):
-#     s3_download = S3Operations()
-#     bucket = s3_download.S3_RESOURCE.Bucket(s3_download.BUCKET)
-#     for obj in bucket.objects.filter(Prefix=s3_download.folder_name):
-#         # Check if the object is a file and not a folder
-#         if not obj.key.endswith('/'):
-#             download_s3_file(obj, s3_download.BUCKET, private_local_folder_path, public_local_folder_path)
 
 # download s3 file
-def download_s3_file(name, obj_key, bucket_name, private_local_folder_path, public_local_folder_path):
-    # check from file_url that file is in s3 or local and ommit download if it is in local
-    # name = frappe.db.sql(f"""select `name` from `tabFile` where `file_url` LIKE '%{obj.key}%'""")
-    # if len(name)==0:
-    #     return
-    print("=/=/=/==/=/=/=/=/=/=/=/==/=/=/=/=/=/=/==/=/=/==/",name)
-    isPrivate = frappe.db.sql(f"""select `is_private` from `tabFile` where `name`='{name}'""")
-
+def download_s3_file(name, obj_key, bucket_name, private_local_folder_path, public_local_folder_path,is_private):
     s3 = S3Operations()
     s3_object = s3.S3_RESOURCE.Object(str(bucket_name), str(obj_key))
     fileName = obj_key.split('/')[-1]
     max_retries = 5
     retry_delay = 0.5
-    print("=/=/=/==/=/=/=/=/=/=/=/==/=/=/=/=/=/=/==/=/=/==/",fileName,bucket_name,isPrivate[0][0])
-    if not isPrivate[0][0]:
+    if not is_private:
         # Download public files to public directory
         local_path = public_local_folder_path + "/" + fileName
         local_url = '/files/' + fileName
@@ -361,24 +346,24 @@ def download_s3_file(name, obj_key, bucket_name, private_local_folder_path, publ
 
 
 #download file from s3 URL
-def download_file_from_s3_url(name, s3_url):
+def download_file_from_s3_url(name, s3_url, is_private):
     # Parse the S3 URL
+    s3_download = S3Operations()
     parsed_url = urlparse(s3_url)
-    bucket_name = parsed_url.path.split('/',2)[1]
-    object_key = parsed_url.path.split('/',2)[2]
-
     site_path = frappe.utils.get_site_path()
     private_local_folder_path = site_path + '/private/files'
     public_local_folder_path = site_path + '/public/files'
 
-    # Download the file using boto3
-    s3_download = S3Operations()
-    download_s3_file(name, object_key, bucket_name, private_local_folder_path, public_local_folder_path)
+    if is_private:
+        object_key = parsed_url.query.split('=',1)[1]
+        download_s3_file(name, object_key, s3_download.BUCKET, private_local_folder_path, public_local_folder_path, is_private)
+    else :
+        object_key = parsed_url.path.split('/',2)[2]
+        download_s3_file(name, object_key, s3_download.BUCKET, private_local_folder_path, public_local_folder_path, is_private)
 
 
 #Update database while downloading files from s3
 def update_db_s3_to_local(file_url, file_path_for_hash, file_name, name):
-    print("--------------------------------------------",file_name)
     try:
         parent_doctype = frappe.db.sql(f"""select `attached_to_doctype` from `tabFile` where `name`='{name}'""")
         parent_name = frappe.db.sql(f"""select `attached_to_name` from `tabFile` where `name`='{name}'""")
@@ -387,10 +372,10 @@ def update_db_s3_to_local(file_url, file_path_for_hash, file_name, name):
         contentHash = update_db_hash_s3_to_local(file_path_for_hash)
 
         doc = frappe.db.sql(f"""UPDATE `tabFile` SET `file_url`='{file_url}', `file_name`='{file_name}', `content_hash`='{contentHash}' WHERE `name` = '{name}'""")
-        # print("=================||||||||||======================",frappe.get_meta(parent_doctype[0][0]).get(parent_field[0][0]))
+
         #See that again
-        if frappe.get_meta(parent_doctype[0][0]).get(parent_field[0][0]):
-            frappe.db.set_value(parent_doctype[0][0], parent_name[0][0], frappe.get_meta(parent_doctype[0][0]).get(parent_field[0][0]), file_url)
+        if not parent_field[0][0]=='None':
+            frappe.db.set_value(parent_doctype[0][0], parent_name[0][0], parent_field[0][0], file_url)
 
         frappe.db.commit()
     except Exception as e:
@@ -407,15 +392,6 @@ def update_db_hash_s3_to_local(file_url):
 def get_content_hash(content):
 	return hashlib.md5(content).hexdigest()
 
-# # Provide local folder path for downloading files from s3
-# def download_files():
-#     site_path = frappe.utils.get_site_path()
-#     private_local_folder_path = site_path + '/private/files'
-#     public_local_folder_path = site_path + '/public/files'
-
-#     # Download private files to a private directory
-#     download_s3_files(private_local_folder_path, public_local_folder_path)
-
 def s3_file_regex_match(file_url):
     """
     Match the public file regex match.
@@ -424,7 +400,6 @@ def s3_file_regex_match(file_url):
         r'^(https:|/api/method/frappe_s3_attachment.controller.generate_file)',
         file_url
     )
-
 
 @frappe.whitelist()
 def migrate_existing_files():
@@ -447,16 +422,15 @@ def migrate_s3_files_to_local():
     """
     Function to migrate the s3 files to local.
     """
-    #download_files()
     # get_all_files_from_public_folder_and_upload_to_s3
     files_list = frappe.get_all(
         'File',
-        fields=['name', 'file_url', 'file_name']
+        fields=['name', 'file_url', 'file_name', 'is_private']
     )
     for file in files_list:
         if file['file_url']:
             if s3_file_regex_match(file['file_url']):
-                download_file_from_s3_url(file['name'], file['file_url'])
+                download_file_from_s3_url(file['name'], file['file_url'], file['is_private'])
     return True
 
 def delete_from_cloud(doc, method):
