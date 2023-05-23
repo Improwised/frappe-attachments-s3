@@ -443,7 +443,7 @@ def migrate_s3_files_to_local():
         fields=['name', 'file_url', 'file_name', 'is_private']
     )
 
-    with open(log_file_path, "r+") as f:
+    with open(log_file_path, "w+") as f:
         f.seek(0)
         f.truncate() 
 
